@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Color Card Guess</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .game { text-align: center; max-width: 400px; }
+    .card {
+      width: 200px; height: 280px; background: #1f2937; border-radius: 16px;
+      display: flex; justify-content: center; align-items: center;
+      font-size: 48px; cursor: pointer; margin: 20px auto; color: #9ca3af;
+      transition: transform 0.6s;
+      transform-style: preserve-3d;
+    }
+    .card.revealed {
+      transform: rotateY(180deg);
+    }
+    .options label { display: block; margin: 8px 0; cursor: pointer; }
+    .feedback { margin-top: 10px; font-weight: bold; min-height: 24px; }
+    .scoreboard { margin-top: 20px; font-size: 14px; }
+    button {
+      margin-top: 15px;
+      padding: 8px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #2563eb;
+      color: white;
+      font-size: 14px;
+      cursor: pointer;
+      display: none;
+    }
+    button:hover { background: #1d4ed8; }
+  </style>
+</head>
+<body>
+  <div class="game">
+    <h1>Color Card Guess</h1>
+    <p>Pick a color, then click the card to reveal!</p>
+
+    <div id="card" class="card">?</div>
+
+    <div class="options">
+      <label><input type="radio" name="guess" value="red"> 🔴 Red</label>
+      <label><input type="radio" name="guess" value="blue"> 🔵 Blue</label>
+      <label><input type="radio" name="guess" value="yellow"> 🟡 Yellow</label>
+    </div>
+
+    <div id="feedback" class="feedback"></div>
+
+    <button id="next">Next Round</button>
+
+    <div class="scoreboard">
+      Wins: <span id="wins">0</span> |
+      Losses: <span id="losses">0</span> |
+      Win %: <span id="winrate">0</span>%
+    </div>
+  </div>
+
+  <script>
+    function pickWeighted(weights) {
+      const entries = Object.entries(weights);
+      let total = entries.reduce((a, [,w]) => a + w, 0);
+      let r = Math.random() * total;
+      for (let [k, w] of entries) {
+        if (r < w) return k;
+        r -= w;
+      }
+    }
+
+    const Generator = (() => {
+      let prev = null, streak = 0;
+      return {
+        next() {
+          if (streak > 0) { streak--; return prev; }
+          if (Math.random() < 0.15) {
+            prev = pickWeighted({red:0.4,blue:0.3,yellow:0.3});
+            streak = Math.floor(Math.random()*2)+1;
+            return prev;
+          }
+          const weights = {red:0.36,blue:0.32,yellow:0.32};
+          if (prev) weights[prev]+=0.15;
+          prev = pickWeighted(weights);
+          return prev;
+        }
+      }
+    })();
+
+    const card=document.getElementById('card');
+    const feedback=document.getElementById('feedback');
+    const options=document.querySelectorAll('input[name="guess"]');
+    const nextBtn=document.getElementById('next');
+    const winsEl=document.getElementById('wins');
+    const lossesEl=document.getElementById('losses');
+    const winrateEl=document.getElementById('winrate');
+
+    let revealed=false, wins=0, losses=0;
+
+    card.addEventListener('click',()=>{
+      const guess=[...options].find(o=>o.checked)?.value;
+      if(!guess){ feedback.textContent="Pick a color first!"; return; }
+      if(revealed) return;
+
+      const actual=Generator.next();
+      card.textContent=actual==="red"?"🔴":actual==="blue"?"🔵":"🟡";
+      card.classList.add("revealed");
+
+      if(guess===actual){
+        feedback.textContent="✅ Correct!";
+        wins++;
+      } else {
+        feedback.textContent=`❌ Wrong! It was ${actual.toUpperCase()}.`;
+        losses++;
+      }
+      updateScore();
+      revealed=true;
+      nextBtn.style.display="inline-block";
+    });
+
+    nextBtn.addEventListener('click',()=>{
+      card.textContent="?";
+      card.classList.remove("revealed");
+      feedback.textContent="";
+      revealed=false;
+      nextBtn.style.display="none";
+      options.forEach(o=>o.checked=false);
+    });
+
+    function updateScore(){
+      winsEl.textContent=wins;
+      lossesEl.textContent=losses;
+      let total=wins+losses;
+      winrateEl.textContent= total? Math.round((wins/total)*100) : 0;
+    }
+  </script>
+</body>
+</html>
